@@ -6,8 +6,10 @@ package mr
 // remember to capitalize all names.
 //
 
-import "os"
-import "strconv"
+import (
+	"os"
+	"strconv"
+)
 
 //
 // example to show how to declare the arguments
@@ -22,8 +24,19 @@ type ExampleReply struct {
 	Y int
 }
 
-// Add your RPC definitions here.
+// Todo(sambhav): Add interface
+type TaskArgs struct {
+	TaskRequired bool
+	WorkerId     string
+}
 
+type TaskReply struct {
+	TaskType   string
+	TaskNumber int
+	inputFile  *string
+}
+
+// Add your RPC definitions here.
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.
