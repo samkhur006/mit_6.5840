@@ -89,10 +89,8 @@ func (c *Coordinator) PeriodicCheck() {
 
 	for {
 		c.mu.Lock()
-		fmt.Println("Periodic check")
 		for i, assignedTime := range c.mapTaskTime {
 			if time.Since(assignedTime) > 10*time.Second {
-				fmt.Printf("### CRASH ### Killing map task worker %s\n", c.mapTaskWorkers[i])
 				c.mapTasksToAssign = append(c.mapTasksToAssign, i)
 				delete(c.mapTaskTime, i)
 				delete(c.mapTaskWorkers, i)
@@ -100,13 +98,11 @@ func (c *Coordinator) PeriodicCheck() {
 		}
 		for i, assignedTime := range c.reduceTaskTime {
 			if time.Since(assignedTime) > 10*time.Second {
-				fmt.Printf("### CRASH ### Killing reduce task worker %s\n", c.reduceTaskWorkers[i])
 				c.reduceTasksToAssign = append(c.reduceTasksToAssign, i)
 				delete(c.reduceTaskTime, i)
 				delete(c.reduceTaskWorkers, i)
 			}
 		}
-		fmt.Println("Sleeping")
 		c.mu.Unlock()
 		time.Sleep(1 * time.Second)
 	}
@@ -114,23 +110,19 @@ func (c *Coordinator) PeriodicCheck() {
 
 func (c *Coordinator) GetTask(args *TaskArgs, reply *TaskReply) error {
 	// Your code here.
-	fmt.Println("Get tasks called, MapTasksDone: ", c.mapTasksDone, " ReduceTasksDone: ", c.reduceTasksDone)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !args.TaskRequired {
-		fmt.Println("Task not required")
 		return nil
 	}
 
 	if c.Done() {
-		fmt.Println("Job done")
 		reply.TaskType = "done"
 		c.workersKilled++
 		return nil
 	}
 
 	if len(c.mapTasksToAssign) > 0 {
-		fmt.Println("Map tasks to assign: ", len(c.mapTasksToAssign))
 		reply.TaskType = "map"
 
 		lastIndex := len(c.mapTasksToAssign) - 1
@@ -145,7 +137,6 @@ func (c *Coordinator) GetTask(args *TaskArgs, reply *TaskReply) error {
 		return nil
 	}
 	if c.mapTasksDone == c.M && len(c.reduceTasksToAssign) > 0 {
-		fmt.Println("Reduce tasks to assign: ", len(c.reduceTasksToAssign))
 		reply.TaskType = "reduce"
 		lastIndex := len(c.reduceTasksToAssign) - 1
 		reply.TaskNumber = c.reduceTasksToAssign[lastIndex]

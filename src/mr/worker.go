@@ -32,7 +32,6 @@ func ihash(key string) int {
 }
 
 func handleMapTask(reply *TaskReply, mapf func(string, string) []KeyValue) {
-	fmt.Printf("####MAP#### worker %s is handling map task %d\n", workerId, reply.TaskNumber)
 	// Read input file and create intermediate eky value pairs
 	//
 	// read each input file,
@@ -79,7 +78,6 @@ func handleMapTask(reply *TaskReply, mapf func(string, string) []KeyValue) {
 		// Write key-value pair to the appropriate intermediate file
 		fmt.Fprintf(files[bucket], "%v %v\n", key, value)
 	}
-	// fmt.Printf("####MAP#### worker %s is done handling map task %d\n", workerId, reply.TaskNumber)
 
 	// Print actual filenames created
 	// fmt.Print("Files created: ")
@@ -90,7 +88,6 @@ func handleMapTask(reply *TaskReply, mapf func(string, string) []KeyValue) {
 }
 
 func handleReduceTask(reply *TaskReply, reducef func(string, []string) string) {
-	fmt.Printf("####REDUCE#### worker %s is handling reduce task %d\n", workerId, reply.TaskNumber)
 
 	intermediate := []KeyValue{}
 	for i := 0; i < reply.NumFiles; i++ {
