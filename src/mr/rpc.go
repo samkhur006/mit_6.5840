@@ -35,10 +35,12 @@ type TaskReply struct {
 	TaskNumber int
 	InputFile  *string
 	NumFiles   int
+	Prefix     string
 }
 
 type StatusUpdate struct {
-	TaskType string
+	TaskType   string
+	TaskNumber int
 }
 
 type StatusUpdateReply struct {

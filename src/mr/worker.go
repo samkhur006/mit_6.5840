@@ -32,7 +32,7 @@ func ihash(key string) int {
 }
 
 func handleMapTask(reply *TaskReply, mapf func(string, string) []KeyValue) {
-	// fmt.Printf("####MAP#### worker %s is handling map task %d\n", workerId, reply.TaskNumber)
+	fmt.Printf("####MAP#### worker %s is handling map task %d\n", workerId, reply.TaskNumber)
 	// Read input file and create intermediate eky value pairs
 	//
 	// read each input file,
@@ -62,7 +62,7 @@ func handleMapTask(reply *TaskReply, mapf func(string, string) []KeyValue) {
 	// Create file handles for all intermediate files
 	files := make([]*os.File, reply.NumFiles)
 	for i := 0; i < reply.NumFiles; i++ {
-		oname := "mr-" + strconv.Itoa(reply.TaskNumber) + "-" + strconv.Itoa(i)
+		oname := workerId + "mr-" + strconv.Itoa(reply.TaskNumber) + "-" + strconv.Itoa(i)
 		file, err := os.Create(oname)
 		if err != nil {
 			log.Fatalf("cannot create %v", oname)
@@ -90,7 +90,7 @@ func handleMapTask(reply *TaskReply, mapf func(string, string) []KeyValue) {
 }
 
 func handleReduceTask(reply *TaskReply, reducef func(string, []string) string) {
-	// fmt.Printf("####REDUCE#### worker %s is handling reduce task %d\n", workerId, reply.TaskNumber)
+	fmt.Printf("####REDUCE#### worker %s is handling reduce task %d\n", workerId, reply.TaskNumber)
 
 	intermediate := []KeyValue{}
 	for i := 0; i < reply.NumFiles; i++ {
@@ -135,7 +135,7 @@ func handleReduceTask(reply *TaskReply, reducef func(string, []string) string) {
 		return intermediate[i].Key < intermediate[j].Key
 	})
 
-	ofileName := "mr-out-" + strconv.Itoa(reply.TaskNumber)
+	ofileName := workerId + "mr-out-" + strconv.Itoa(reply.TaskNumber)
 	ofile, err := os.Create(ofileName)
 	if err != nil {
 		log.Fatalf("cannot create %v", ofileName)
@@ -175,12 +175,12 @@ func Worker(mapf func(string, string) []KeyValue,
 
 		ok := call("Coordinator.GetTask", args, reply)
 		if !ok {
-			fmt.Printf("call failed!")
+			fmt.Printf("call failed1!")
 			return
 		}
 
 		if reply.TaskType == "done" {
-			// fmt.Printf("worker %s is done\n", workerId)
+			fmt.Printf("worker %s is done\n", workerId)
 			os.Exit(0)
 		}
 
@@ -188,7 +188,8 @@ func Worker(mapf func(string, string) []KeyValue,
 		case "map":
 			handleMapTask(reply, mapf)
 			updateArgs := &StatusUpdate{
-				TaskType: "map",
+				TaskType:   "map",
+				TaskNumber: reply.TaskNumber,
 			}
 			updateReply := &StatusUpdateReply{}
 			ok := call("Coordinator.UpdateStatus", updateArgs, updateReply)
@@ -199,7 +200,8 @@ func Worker(mapf func(string, string) []KeyValue,
 		case "reduce":
 			handleReduceTask(reply, reducef)
 			updateArgs := &StatusUpdate{
-				TaskType: "reduce",
+				TaskType:   "reduce",
+				TaskNumber: reply.TaskNumber,
 			}
 			updateReply := &StatusUpdateReply{}
 			ok := call("Coordinator.UpdateStatus", updateArgs, updateReply)
@@ -241,7 +243,7 @@ func CallExample() {
 		// reply.Y should be 100.
 		fmt.Printf("reply.Y %v\n", reply.Y)
 	} else {
-		fmt.Printf("call failed!\n")
+		fmt.Printf("call failed2!\n")
 	}
 }
 
