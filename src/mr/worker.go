@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -206,6 +207,8 @@ func Worker(mapf func(string, string) []KeyValue,
 				fmt.Printf("update call failed!")
 				return
 			}
+		case "wait":
+			time.Sleep(1 * time.Second)
 		}
 
 		// uncomment to send the Example RPC to the coordinator.

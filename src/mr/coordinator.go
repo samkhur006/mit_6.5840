@@ -20,6 +20,7 @@ type Coordinator struct {
 	reduceTasksAssigned int
 	mapTasksDone        int
 	reduceTasksDone     int
+	availableWorkers    map[string]bool
 	mapWorkers          []string
 	reduceWorkers       []string
 	workersKilled       int
@@ -74,6 +75,7 @@ func (c *Coordinator) GetTask(args *TaskArgs, reply *TaskReply) error {
 		c.reduceTasksAssigned++
 		return nil
 	}
+	reply.TaskType = "wait"
 
 	return nil
 }
