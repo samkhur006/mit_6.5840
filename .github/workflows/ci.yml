@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repo code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Setup Go 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' 
+
+      # Formatting check (mandatory)
+      - name: Run gofmt
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go files are not formatted. Run 'gofmt -w .'"
+            exit 1
+          fi
+
+      # Run your test script
+      - name: Run tests
+        run: bash test-mr.sh
