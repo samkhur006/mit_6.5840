@@ -33,7 +33,15 @@ type TaskArgs struct {
 type TaskReply struct {
 	TaskType   string
 	TaskNumber int
-	inputFile  *string
+	InputFile  *string
+	NumFiles   int
+}
+
+type StatusUpdate struct {
+	TaskType string
+}
+
+type StatusUpdateReply struct {
 }
 
 // Add your RPC definitions here.

@@ -1,32 +1,50 @@
 package mr
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
+	"sync"
 )
 
 type Coordinator struct {
 	// Your definitions here.
-	M                 int
-	R                 int
-	inputFiles        []string
-	intermediateFiles [][]string
-	outputFiles       []string
-	mapTasksDone      int
-	reduceTasksDone   int
-	mapWorkers        []string
-	reduceWorkers     []string
-	workersKilled     int
+	M                   int
+	R                   int
+	inputFiles          []string
+	intermediateFiles   [][]string
+	mapTasksAssigned    int
+	reduceTasksAssigned int
+	mapTasksDone        int
+	reduceTasksDone     int
+	mapWorkers          []string
+	reduceWorkers       []string
+	workersKilled       int
+	mu                  sync.Mutex
 }
 
 //Todo(sambhav): Change to gRPC
 // Your code here -- RPC handlers for the worker to call.
 
+func (c *Coordinator) UpdateStatus(args *StatusUpdate, reply *StatusUpdateReply) error {
+	// Your code here.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if args.TaskType == "map" {
+		c.mapTasksDone++
+	}
+	if args.TaskType == "reduce" {
+		c.reduceTasksDone++
+	}
+	return nil
+}
 func (c *Coordinator) GetTask(args *TaskArgs, reply *TaskReply) error {
 	// Your code here.
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if !args.TaskRequired {
 		return nil
 	}
@@ -37,20 +55,23 @@ func (c *Coordinator) GetTask(args *TaskArgs, reply *TaskReply) error {
 		return nil
 	}
 
-	if c.mapTasksDone < c.M {
+	if c.mapTasksAssigned < c.M {
 		reply.TaskType = "map"
-		reply.TaskNumber = c.mapTasksDone
-		reply.inputFile = &c.inputFiles[c.mapTasksDone]
-		c.mapWorkers[c.mapTasksDone] = args.WorkerId
-		c.mapTasksDone++
+		reply.TaskNumber = c.mapTasksAssigned
+		// fmt.Println("map task number", c.mapTasksAssigned, "size of input files", len(c.inputFiles))
+		reply.InputFile = &c.inputFiles[c.mapTasksAssigned]
+		reply.NumFiles = c.R
+		c.mapWorkers[c.mapTasksAssigned] = args.WorkerId
+		c.mapTasksAssigned++
 		return nil
 	}
-	if c.reduceTasksDone < c.R {
+	if c.mapTasksDone == c.M && c.reduceTasksAssigned < c.R {
 		reply.TaskType = "reduce"
-		reply.TaskNumber = c.reduceTasksDone
-		reply.inputFile = nil
-		c.reduceWorkers[c.reduceTasksDone] = args.WorkerId
-		c.reduceTasksDone++
+		reply.TaskNumber = c.reduceTasksAssigned
+		reply.InputFile = nil
+		reply.NumFiles = c.M
+		c.reduceWorkers[c.reduceTasksAssigned] = args.WorkerId
+		c.reduceTasksAssigned++
 		return nil
 	}
 
@@ -91,14 +112,18 @@ func (c *Coordinator) Done() bool {
 // main/mrcoordinator.go calls this function.
 // nReduce is the number of reduce tasks to use.
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
-	c := Coordinator{M: len(files), R: nReduce, mapTasksDone: 0, reduceTasksDone: 0, inputFiles: files,
-		outputFiles: make([]string, nReduce), workersKilled: 0,
-		mapWorkers: make([]string, 0), reduceWorkers: make([]string, 0)}
+	c := Coordinator{M: len(files), R: nReduce, mapTasksAssigned: 0, reduceTasksAssigned: 0, inputFiles: files,
+		workersKilled: 0, mapTasksDone: 0, reduceTasksDone: 0,
+		mapWorkers: make([]string, len(files)), reduceWorkers: make([]string, nReduce)}
 
 	// Initialize 2D slice for intermediate files [M][R]
 	c.intermediateFiles = make([][]string, c.M)
 	for i := range c.intermediateFiles {
 		c.intermediateFiles[i] = make([]string, c.R)
+	}
+	for _, file := range c.inputFiles {
+		fmt.Println(file)
+
 	}
 
 	// Your code here.
