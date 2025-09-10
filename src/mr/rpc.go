@@ -6,8 +6,10 @@ package mr
 // remember to capitalize all names.
 //
 
-import "os"
-import "strconv"
+import (
+	"os"
+	"strconv"
+)
 
 //
 // example to show how to declare the arguments
@@ -20,6 +22,28 @@ type ExampleArgs struct {
 
 type ExampleReply struct {
 	Y int
+}
+
+// Todo(sambhav): Add interface
+type TaskArgs struct {
+	TaskRequired bool
+	WorkerId     string
+}
+
+type TaskReply struct {
+	TaskType   string
+	TaskNumber int
+	InputFile  *string
+	NumFiles   int
+	Prefix     string
+}
+
+type StatusUpdate struct {
+	TaskType   string
+	TaskNumber int
+}
+
+type StatusUpdateReply struct {
 }
 
 // Add your RPC definitions here.
