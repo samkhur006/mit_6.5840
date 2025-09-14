@@ -152,25 +152,27 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// fmt.Printf("[%d]AppendEntries from %d at %v\n", rf.me, args.LeaderId, time.Now())
 
 	rf.lastElectionTime = time.Now()
-	rf.electionTimer = time.Duration(rand.Int63()%7+5) * time.Millisecond
+	rf.electionTimer = time.Duration(rand.Int63()%7+10) * time.Millisecond
 
 	if rf.currentTerm < args.Term {
 		rf.votedFor = -1
 	}
 
 	rf.currentTerm = args.Term
+	reply.Term = args.Term
 }
 
 func (rf *Raft) Heartbeat() {
 	fmt.Printf("!!!!!! [%d]Heartbeat started at %v\n", rf.me, time.Now())
-	for {
+	for rf.status == "leader" {
+		count := 1
 		if rf.killed() {
 			fmt.Printf("!!!!!! [%d]Heartbeat killed at %v\n", rf.me, time.Now())
 			return
 		}
 		for i := 0; i < len(rf.peers); i++ {
 			if i != rf.me {
-				go func(idx int) {
+				go func(idx int, count *int) {
 					reply := &AppendEntriesReply{}
 					args := &AppendEntriesArgs{
 						Term:     rf.currentTerm,
@@ -180,10 +182,18 @@ func (rf *Raft) Heartbeat() {
 					if !ok {
 						return
 					}
-				}(i)
+					if reply.Term > 0 {
+						*count++
+					}
+				}(i, &count)
 			}
 		}
 		time.Sleep(2 * time.Millisecond)
+		if count <= len(rf.peers)/2 {
+			fmt.Printf("!!!!!! [%d]Heartbeat failed at %v\n", rf.me, time.Now())
+			rf.status = "candidate"
+			return
+		}
 	}
 }
 
@@ -252,7 +262,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 func (rf *Raft) startElection() {
 
 	rf.mu.Lock()
-	rf.electionTimer = time.Duration(rand.Int63()%7+5) * time.Millisecond
+	rf.electionTimer = time.Duration(rand.Int63()%7+10) * time.Millisecond
 	// if rf.votedFor != -1 {
 	// 	rf.mu.Unlock()
 	// 	return
@@ -277,7 +287,7 @@ func (rf *Raft) startElection() {
 	//add conditional var maybe
 	for i := 0; i < len(rf.peers); i++ {
 		if i != rf.me {
-			func(idx int) {
+			go func(idx int) {
 				reply := &RequestVoteReply{}
 				if rf.sendRequestVote(idx, args, reply) {
 					fmt.Printf("[%d]      Appending count to %d\n", rf.me, rf.count+1)
@@ -286,6 +296,7 @@ func (rf *Raft) startElection() {
 			}(i)
 		}
 	}
+	time.Sleep(2 * time.Millisecond)
 	rf.lastElectionTime = time.Now()
 	fmt.Printf("[%d] GOT %d votes\n", rf.me, rf.count)
 	if rf.count > len(rf.peers)/2 {
@@ -379,7 +390,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	persister *tester.Persister, applyCh chan raftapi.ApplyMsg) raftapi.Raft {
 	rf := &Raft{votedFor: -1, currentTerm: 0, log: make([]int, 0), commitIndex: 0, lastApplied: 0, nextIndex: make([]int, len(peers)), matchIndex: make([]int, len(peers)),
 		status:           "candidate",
-		electionTimer:    time.Duration(rand.Int63()%7+5) * time.Millisecond,
+		electionTimer:    time.Duration(rand.Int63()%7+10) * time.Millisecond,
 		lastElectionTime: time.Now()}
 	rf.peers = peers
 	rf.persister = persister
