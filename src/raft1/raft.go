@@ -9,6 +9,7 @@ package raft
 import (
 	//	"bytes"
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -42,7 +43,7 @@ type Raft struct {
 
 	count int
 
-	electionTimer    time.Duration
+	electionTimeout  time.Duration
 	lastElectionTime time.Time
 
 	// Your data here (3A, 3B, 3C).
@@ -152,10 +153,16 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// fmt.Printf("[%d]AppendEntries from %d at %v\n", rf.me, args.LeaderId, time.Now())
 
 	rf.lastElectionTime = time.Now()
-	rf.electionTimer = time.Duration(rand.Int63()%7+10) * time.Millisecond
+
+	if rf.currentTerm == args.Term {
+		if rf.status == "leader" {
+			log.Fatalf("Leader %d received AppendEntries from %d at %v", rf.me, args.LeaderId, time.Now())
+		}
+	}
 
 	if rf.currentTerm < args.Term {
 		rf.votedFor = -1
+		rf.status = "follower"
 	}
 
 	rf.currentTerm = args.Term
@@ -165,6 +172,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 func (rf *Raft) Heartbeat() {
 	fmt.Printf("!!!!!! [%d]Heartbeat started at %v\n", rf.me, time.Now())
 	for rf.status == "leader" {
+		var lk sync.Mutex
 		count := 1
 		if rf.killed() {
 			fmt.Printf("!!!!!! [%d]Heartbeat killed at %v\n", rf.me, time.Now())
@@ -183,12 +191,14 @@ func (rf *Raft) Heartbeat() {
 						return
 					}
 					if reply.Term > 0 {
+						lk.Lock()
 						*count++
+						lk.Unlock()
 					}
 				}(i, &count)
 			}
 		}
-		time.Sleep(2 * time.Millisecond)
+		time.Sleep(4 * time.Millisecond)
 		if count <= len(rf.peers)/2 {
 			fmt.Printf("!!!!!! [%d]Heartbeat failed at %v\n", rf.me, time.Now())
 			rf.status = "candidate"
@@ -212,6 +222,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	if rf.votedFor == -1 || rf.votedFor == args.CandidateId || rf.currentTerm < args.Term {
 		fmt.Printf("%d is giving vote to %d at %v\n", rf.me, args.CandidateId, time.Now())
 		rf.currentTerm = args.Term
+		rf.status = "follower"
 		reply.VoteGranted = true
 		rf.votedFor = args.CandidateId
 		rf.lastElectionTime = time.Now()
@@ -262,7 +273,6 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 func (rf *Raft) startElection() {
 
 	rf.mu.Lock()
-	rf.electionTimer = time.Duration(rand.Int63()%7+10) * time.Millisecond
 	// if rf.votedFor != -1 {
 	// 	rf.mu.Unlock()
 	// 	return
@@ -290,15 +300,17 @@ func (rf *Raft) startElection() {
 			go func(idx int) {
 				reply := &RequestVoteReply{}
 				if rf.sendRequestVote(idx, args, reply) {
-					fmt.Printf("[%d]      Appending count to %d\n", rf.me, rf.count+1)
+					// fmt.Printf("[%d]      Appending count to %d\n", rf.me, rf.count+1)
+					rf.mu.Lock()
 					rf.count++
+					rf.mu.Unlock()
 				}
 			}(i)
 		}
 	}
-	time.Sleep(2 * time.Millisecond)
+	time.Sleep(4 * time.Millisecond)
 	rf.lastElectionTime = time.Now()
-	fmt.Printf("[%d] GOT %d votes\n", rf.me, rf.count)
+	// fmt.Printf("[%d] GOT %d votes for term %d\n", rf.me, rf.count, rf.currentTerm)
 	if rf.count > len(rf.peers)/2 {
 		rf.mu.Lock()
 		rf.status = "leader"
@@ -359,15 +371,18 @@ func (rf *Raft) killed() bool {
 func (rf *Raft) ticker() {
 	for rf.killed() == false {
 
-		fmt.Printf("[%d] TICKER at time %v\n", rf.me, time.Now())
+		// fmt.Printf("[%d] TICKER at time %v\n", rf.me, time.Now())
 
 		// Your code here (3A)
 		// Check if a leader election should be started.
-		if time.Since(rf.lastElectionTime) > rf.electionTimer {
-			fmt.Printf("		STARTING ELECTION, me: %d, status: %s\n, lastElectionTime: %v, electionTimer: %v\n", rf.me, rf.status, rf.lastElectionTime, rf.electionTimer)
+		rf.mu.Lock()
+		if time.Since(rf.lastElectionTime) > rf.electionTimeout {
+			rf.mu.Unlock()
+			fmt.Printf("		STARTING ELECTION, me: %d, status: %s\n, lastElectionTime: %v\n", rf.me, rf.status, rf.lastElectionTime)
 			rf.startElection()
 		} else {
 			fmt.Printf("[%d]Not starting election, time since last election: %v\n", rf.me, time.Since(rf.lastElectionTime))
+			rf.mu.Unlock()
 		}
 
 		// pause for a random amount of time between 50 and 350
@@ -390,7 +405,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	persister *tester.Persister, applyCh chan raftapi.ApplyMsg) raftapi.Raft {
 	rf := &Raft{votedFor: -1, currentTerm: 0, log: make([]int, 0), commitIndex: 0, lastApplied: 0, nextIndex: make([]int, len(peers)), matchIndex: make([]int, len(peers)),
 		status:           "candidate",
-		electionTimer:    time.Duration(rand.Int63()%7+10) * time.Millisecond,
+		electionTimeout:  40 * time.Millisecond,
 		lastElectionTime: time.Now()}
 	rf.peers = peers
 	rf.persister = persister
@@ -398,7 +413,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// if me == 0 {
 	// 	rf.status = "leader"
 	// }
-	fmt.Printf("INIT, me: %d, status: %s\n, lastElectionTime: %v, electionTimer: %v\n", me, rf.status, rf.lastElectionTime, rf.electionTimer)
+	fmt.Printf("INIT, me: %d, status: %s\n, lastElectionTime: %v\n", me, rf.status, rf.lastElectionTime)
 
 	// Your initialization code here (3A, 3B, 3C).
 
