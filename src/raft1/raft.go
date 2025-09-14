@@ -200,7 +200,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		return
 	}
 	if rf.votedFor == -1 || rf.votedFor == args.CandidateId || rf.currentTerm < args.Term {
-		fmt.Printf("%d is giving vote to %d\n", rf.me, args.CandidateId)
+		fmt.Printf("%d is giving vote to %d at %v\n", rf.me, args.CandidateId, time.Now())
 		rf.currentTerm = args.Term
 		reply.VoteGranted = true
 		rf.votedFor = args.CandidateId
@@ -280,7 +280,7 @@ func (rf *Raft) startElection() {
 			func(idx int) {
 				reply := &RequestVoteReply{}
 				if rf.sendRequestVote(idx, args, reply) {
-					fmt.Printf("[%d]      Appending count to %d\n", rf.me, rf.count)
+					fmt.Printf("[%d]      Appending count to %d\n", rf.me, rf.count+1)
 					rf.count++
 				}
 			}(i)
