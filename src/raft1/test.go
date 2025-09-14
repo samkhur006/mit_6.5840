@@ -11,7 +11,7 @@ import (
 
 	"6.5840/labrpc"
 	"6.5840/raftapi"
-	"6.5840/tester1"
+	tester "6.5840/tester1"
 )
 
 type Test struct {
@@ -65,6 +65,7 @@ func (ts *Test) checkOneLeader() int {
 	tester.AnnotateCheckerBegin("checking for a single leader")
 	for iters := 0; iters < 10; iters++ {
 		ms := 450 + (rand.Int63() % 100)
+		fmt.Printf("Test sleeping for %d ms\n", ms)
 		time.Sleep(time.Duration(ms) * time.Millisecond)
 
 		leaders := make(map[int][]int)

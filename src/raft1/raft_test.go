@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"6.5840/tester1"
+	tester "6.5840/tester1"
 )
 
 // The tester generously allows solutions to complete elections in one second
@@ -34,6 +34,7 @@ func TestInitialElection3A(t *testing.T) {
 
 	// is a leader elected?
 	ts.checkOneLeader()
+	fmt.Printf("ONE leader elected\n")
 
 	// sleep a bit to avoid racing with followers learning of the
 	// election, then check that all peers agree on the term.
